@@ -29,7 +29,34 @@ if found is None:
 
 try:
     if found.endswith(".joblib"):
-        model = joblib.load(found)
+        try:
+            model = joblib.load(found)
+        except AttributeError as e:
+            # Common situation: sklearn helper classes moved between versions and
+            # the pickled object references a class path that doesn't exist.
+            # Try to parse the missing attribute and module from the message,
+            # create a minimal placeholder class in that module, and retry.
+            import re
+            import importlib
+
+            msg = str(e)
+            m = re.search(r"Can't get attribute '(?P<attr>[^']+)' on <module '(?P<mod>[^']+)'", msg)
+            if m:
+                missing_attr = m.group('attr')
+                missing_mod = m.group('mod')
+                try:
+                    mod = importlib.import_module(missing_mod)
+                    # create a simple placeholder class with the same name
+                    placeholder = type(missing_attr, (), {})
+                    setattr(mod, missing_attr, placeholder)
+                    st.warning(f"Compatibility shim: created placeholder {missing_attr} in module {missing_mod}; retrying model load.")
+                    model = joblib.load(found)
+                except Exception as e2:
+                    st.error(f"Failed to create compatibility shim for '{missing_attr}' in module '{missing_mod}': {e2}")
+                    st.stop()
+            else:
+                st.error(f"Failed to load joblib model '{found}': {e}")
+                st.stop()
     else:
         # fall back to pickle for .pkl files
         with open(found, "rb") as f:
