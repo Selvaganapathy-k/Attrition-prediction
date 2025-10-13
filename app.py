@@ -1,15 +1,41 @@
 import streamlit as st
 import pandas as pd
 import pickle
+import joblib
+import os
 
 # ----------------------------------------------------
-# Load the trained model
+# Load the trained model (tries .joblib first, then common .pkl names)
 # ----------------------------------------------------
+MODEL_CANDIDATES = [
+    "attrition_model.joblib",
+    "employee-attrition.joblib",
+    "employee-attrition.pkl",
+    "attrition_model.pkl",
+]
+
+model = None
+found = None
+for fname in MODEL_CANDIDATES:
+    if os.path.exists(fname):
+        found = fname
+        break
+
+if found is None:
+    st.error(
+        "❌ No trained model found. Place one of the model files in the app folder: 'attrition_model.joblib', 'employee-attrition.joblib', 'employee-attrition.pkl', or 'attrition_model.pkl'."
+    )
+    st.stop()
+
 try:
-    with open("employee-attrition.pkl", "rb") as f:
-        model = pickle.load(f)
-except FileNotFoundError:
-    st.error("❌ Model file 'attrition_model.pkl' not found. Please upload it to the same folder.")
+    if found.endswith(".joblib"):
+        model = joblib.load(found)
+    else:
+        # fall back to pickle for .pkl files
+        with open(found, "rb") as f:
+            model = pickle.load(f)
+except Exception as e:
+    st.error(f"Failed to load model '{found}': {e}")
     st.stop()
 
 # ----------------------------------------------------
