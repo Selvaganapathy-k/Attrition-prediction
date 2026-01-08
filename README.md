@@ -1,4 +1,3 @@
-Subject: README.md – Employee Attrition Prediction
 
 # 💼 Employee Attrition Prediction
 
